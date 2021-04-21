@@ -1,0 +1,39 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+httpPort = ENV["HTTP_PORT"] || 80
+httpsPort = ENV["HTTPS_PORT"] || ""
+certs = ENV["CERTS"] || ""
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/focal64"
+
+  config.vm.network "forwarded_port", guest: 80, host: httpPort
+  if httpsPort != ""
+    config.vm.network "forwarded_port", guest: 443, host: httpsPort
+  end
+
+  config.vm.provider "virtualbox" do |vb|
+    # Display the VirtualBox GUI when booting the machine
+    # vb.gui = true
+
+    # Customize the amount of memory on the VM:
+    vb.memory = "6144"
+  end
+
+  if certs != ""
+    config.vm.provision "shell", :args => [certs], inline: <<-SHELL
+      cp -r $1 certs
+    SHELL
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get remove docker docker-engine docker.io containerd runc
+    apt-get update -y
+    apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null    
+    apt-get update -y
+    apt-get install -y docker-ce docker-ce-cli containerd.io
+    usermod -aG docker vagrant
+  SHELL
+end
